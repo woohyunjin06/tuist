@@ -26,18 +26,19 @@ final class BuildServiceErrorTests: TuistUnitTestCase {
 
 final class BuildServiceTests: TuistUnitTestCase {
     var generator: MockGenerator!
-    var xcodebuildController: MockXcodeBuildController!
+    var xcodeBuildController: MockXcodeBuildController!
     var buildgraphInspector: MockBuildGraphInspector!
     var subject: BuildService!
 
     override func setUp() {
         super.setUp()
         generator = MockGenerator()
-        xcodebuildController = MockXcodeBuildController()
+        xcodeBuildController = MockXcodeBuildController()
         buildgraphInspector = MockBuildGraphInspector()
         subject = BuildService(
             generator: generator,
-            xcodebuildController: xcodebuildController,
+            xcodeBuildController: xcodeBuildController,
+            xcodeBuildLocator: XcodeBuildLocator(),
             buildGraphInspector: buildgraphInspector
         )
     }
@@ -45,7 +46,7 @@ final class BuildServiceTests: TuistUnitTestCase {
     override func tearDown() {
         super.tearDown()
         generator = nil
-        xcodebuildController = nil
+        xcodeBuildController = nil
         buildgraphInspector = nil
         subject = nil
     }
@@ -83,7 +84,7 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        xcodebuildController.buildStub = { _target, _scheme, _clean, _arguments in
+        xcodeBuildController.buildStub = { _target, _scheme, _clean, _arguments in
             XCTAssertEqual(_target, .workspace(workspacePath))
             XCTAssertEqual(_scheme, scheme.name)
             XCTAssertTrue(_clean)
@@ -130,7 +131,7 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        xcodebuildController.buildStub = { _target, _scheme, _clean, _arguments in
+        xcodeBuildController.buildStub = { _target, _scheme, _clean, _arguments in
             XCTAssertEqual(_target, .workspace(workspacePath))
             XCTAssertEqual(_scheme, scheme.name)
             XCTAssertTrue(_clean)
@@ -178,7 +179,7 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        xcodebuildController.buildStub = { _target, _scheme, _clean, _arguments in
+        xcodeBuildController.buildStub = { _target, _scheme, _clean, _arguments in
             XCTAssertEqual(_target, .workspace(workspacePath))
             XCTAssertEqual(_arguments, buildArguments)
 
@@ -234,7 +235,7 @@ final class BuildServiceTests: TuistUnitTestCase {
             XCTAssertEqual(_skipSigning, skipSigning)
             return buildArguments
         }
-        xcodebuildController.buildStub = { _target, _scheme, _clean, _arguments in
+        xcodeBuildController.buildStub = { _target, _scheme, _clean, _arguments in
             XCTAssertEqual(_target, .workspace(workspacePath))
             XCTAssertEqual(_arguments, buildArguments)
 
@@ -301,6 +302,7 @@ private extension BuildService {
             generate: generate,
             clean: clean,
             configuration: configuration,
+            productsPath: nil,
             path: path
         )
     }

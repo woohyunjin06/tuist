@@ -37,17 +37,23 @@ final class BuildService {
     let generator: Generating
 
     /// Xcode build controller.
-    let xcodebuildController: XcodeBuildControlling
+    let xcodeBuildController: XcodeBuildControlling
+
+    /// Locator for finding `xcodebuild` output directory.
+    let xcodeBuildLocator: XcodeBuildLocating
 
     /// Build graph inspector.
     let buildGraphInspector: BuildGraphInspecting
 
-    init(generator: Generating = Generator(contentHasher: CacheContentHasher()),
-         xcodebuildController: XcodeBuildControlling = XcodeBuildController(),
-         buildGraphInspector: BuildGraphInspecting = BuildGraphInspector())
-    {
+    init(
+        generator: Generating = Generator(contentHasher: CacheContentHasher()),
+        xcodeBuildController: XcodeBuildControlling = XcodeBuildController(),
+        xcodeBuildLocator: XcodeBuildLocating = XcodeBuildLocator(),
+        buildGraphInspector: BuildGraphInspecting = BuildGraphInspector()
+    ) {
         self.generator = generator
-        self.xcodebuildController = xcodebuildController
+        self.xcodeBuildController = xcodeBuildController
+        self.xcodeBuildLocator = xcodeBuildLocator
         self.buildGraphInspector = buildGraphInspector
     }
 
@@ -56,6 +62,7 @@ final class BuildService {
         generate: Bool,
         clean: Bool,
         configuration: String?,
+        productsPath: AbsolutePath?,
         path: AbsolutePath
     ) throws {
         let graph: ValueGraph
@@ -70,19 +77,38 @@ final class BuildService {
 
         logger.log(level: .debug, "Found the following buildable schemes: \(buildableSchemes.map(\.name).joined(separator: ", "))")
 
+        let workspacePath = try buildGraphInspector.workspacePath(directory: path)!
+
         if let schemeName = schemeName {
             guard let scheme = buildableSchemes.first(where: { $0.name == schemeName }) else {
                 throw BuildServiceError.schemeNotFound(scheme: schemeName, existing: buildableSchemes.map(\.name))
             }
-            try buildScheme(scheme: scheme, graphTraverser: graphTraverser, path: path, clean: clean, configuration: configuration)
+
+            try buildScheme(
+                scheme: scheme,
+                graphTraverser: graphTraverser,
+                workspacePath: workspacePath,
+                clean: clean,
+                configuration: configuration
+            )
         } else {
             var cleaned: Bool = false
             // Run only buildable entry schemes when specific schemes has not been passed
             let buildableEntrySchemes = buildGraphInspector.buildableEntrySchemes(graphTraverser: graphTraverser)
             try buildableEntrySchemes.forEach {
-                try buildScheme(scheme: $0, graphTraverser: graphTraverser, path: path, clean: !cleaned && clean, configuration: configuration)
+                try buildScheme(
+                    scheme: $0,
+                    graphTraverser: graphTraverser,
+                    workspacePath: workspacePath,
+                    clean: !cleaned && clean,
+                    configuration: configuration
+                )
                 cleaned = true
             }
+        }
+
+        if let productsPath = productsPath {
+            try copyBuildProducts(to: productsPath, workspacePath: workspacePath)
         }
 
         logger.log(level: .notice, "The project built successfully", metadata: .success)
@@ -90,21 +116,48 @@ final class BuildService {
 
     // MARK: - private
 
-    private func buildScheme(scheme: Scheme, graphTraverser: GraphTraversing, path: AbsolutePath, clean: Bool, configuration: String?) throws {
+    private func buildScheme(
+        scheme: Scheme,
+        graphTraverser: GraphTraversing,
+        workspacePath: AbsolutePath,
+        clean: Bool,
+        configuration: String?
+    ) throws {
         logger.log(level: .notice, "Building scheme \(scheme.name)", metadata: .section)
         guard let (project, target) = buildGraphInspector.buildableTarget(scheme: scheme, graphTraverser: graphTraverser) else {
             throw BuildServiceError.schemeWithoutBuildableTargets(scheme: scheme.name)
         }
-        let workspacePath = try buildGraphInspector.workspacePath(directory: path)!
+
         let buildArguments = buildGraphInspector.buildArguments(project: project, target: target, configuration: configuration, skipSigning: false)
-        _ = try xcodebuildController.build(
-            .workspace(workspacePath),
-            scheme: scheme.name,
-            clean: clean,
-            arguments: buildArguments
-        )
-        .printFormattedOutput()
-        .toBlocking()
-        .last()
+
+        _ = try xcodeBuildController
+            .build(
+                .workspace(workspacePath),
+                scheme: scheme.name,
+                clean: clean,
+                arguments: buildArguments
+            )
+            .printFormattedOutput()
+            .toBlocking()
+            .last()
+    }
+
+    private func copyBuildProducts(
+        to outputPath: AbsolutePath,
+        workspacePath: AbsolutePath
+    ) throws {
+        let buildOutputDirectory = try xcodeBuildLocator.locateProductsDirectory(for: workspacePath)
+
+        guard FileHandler.shared.exists(buildOutputDirectory) else {
+            logger.error("No build products found at \(buildOutputDirectory.pathString), skipping copy products")
+            return
+        }
+
+        if FileHandler.shared.exists(outputPath) {
+            try FileHandler.shared.delete(outputPath)
+        }
+
+        logger.log(level: .notice, "Copying build products to \(outputPath.pathString)", metadata: .subsection)
+        try FileHandler.shared.copy(from: buildOutputDirectory, to: outputPath)
     }
 }

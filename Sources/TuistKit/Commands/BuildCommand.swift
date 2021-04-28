@@ -40,6 +40,13 @@ struct BuildCommand: ParsableCommand {
     )
     var configuration: String?
 
+
+    @Option(
+        help: "The directory where the build products will be copied to when project is built.",
+        completion: .directory
+    )
+    var productsPath: String?
+
     func run() throws {
         let absolutePath: AbsolutePath
         if let path = path {
@@ -47,11 +54,13 @@ struct BuildCommand: ParsableCommand {
         } else {
             absolutePath = FileHandler.shared.currentPath
         }
+
         try BuildService().run(
             schemeName: scheme,
             generate: generate,
             clean: clean,
             configuration: configuration,
+            productsPath: productsPath.map { AbsolutePath($0, relativeTo: FileHandler.shared.currentPath) },
             path: absolutePath
         )
     }
