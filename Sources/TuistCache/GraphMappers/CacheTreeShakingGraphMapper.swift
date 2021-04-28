@@ -75,21 +75,26 @@ public final class CacheTreeShakingGraphMapper: GraphMapping {
 
     fileprivate func treeShake(schemes: [Scheme], sourceTargets: Set<TargetReference>) -> [Scheme] {
         schemes.compactMap { scheme -> Scheme? in
-            let buildActionTargets = scheme.buildAction?.targets.filter { sourceTargets.contains($0) } ?? []
+            var focusedScheme = scheme
 
-            // The scheme contains no buildable targets so we don't include it.
-            if buildActionTargets.isEmpty { return nil }
+            var focusedBuildAction = scheme.buildAction
+            focusedBuildAction?.targets = scheme.buildAction?.targets.filter(sourceTargets.contains) ?? []
 
-            let testActionTargets = scheme.testAction?.targets.filter { sourceTargets.contains($0.target) } ?? []
-            var scheme = scheme
-            var buildAction = scheme.buildAction
-            var testAction = scheme.testAction
-            buildAction?.targets = buildActionTargets
-            testAction?.targets = testActionTargets
-            scheme.buildAction = buildAction
-            scheme.testAction = testAction
+            var focusedTestAction = scheme.testAction
+            focusedTestAction?.targets = scheme.testAction?.targets.filter { sourceTargets.contains($0.target) } ?? []
+            focusedTestAction?.codeCoverageTargets = scheme.testAction?.codeCoverageTargets.filter(sourceTargets.contains) ?? []
 
-            return scheme
+            focusedScheme.buildAction = focusedBuildAction
+            focusedScheme.testAction = focusedTestAction
+
+            guard
+                focusedBuildAction?.targets.isEmpty == false ||
+                focusedTestAction?.targets.isEmpty == false
+            else {
+                return nil
+            }
+
+            return focusedScheme
         }
     }
 }

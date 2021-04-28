@@ -3,7 +3,7 @@
 Please, check out guidelines: https://keepachangelog.com/en/1.0.0/
 
 ## Next
-
+  
 ### Added
 - Add support for `runPostActionsOnFailure` for post build actions. [#2752](https://github.com/tuist/tuist/pull/2752) by [@FranzBusch](https://github.com/FranzBusch)
 - Make `ValueGraph` serializable. [#2811](https://github.com/tuist/tuist/pull/2811) by [@laxmorek](https://github.com/laxmorek)
@@ -17,7 +17,7 @@ Please, check out guidelines: https://keepachangelog.com/en/1.0.0/
 ### Fixed
 
 - Fix `.messagesExtension` default settings to include the appropriate `LD_RUNPATH_SEARCH_PATHS` [#2824](https://github.com/tuist/tuist/pull/2824) by [@kwridan](https://github.com/kwridan)
-
+- Fix `tuist focus` not excluding targets from `codeCoverageTargets` of custom schemes by [@Luis Padron](https://github.com/luispadron). 
 ## 1.40.0
 
 ### Added
