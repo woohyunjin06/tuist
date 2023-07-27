@@ -25,6 +25,7 @@ final class CacheWarmService {
         xcframeworks: Bool,
         destination: CacheXCFrameworkDestination,
         targets: Set<String>,
+        excludedTargets: Set<String>,
         dependenciesOnly: Bool
     ) async throws {
         let path = try self.path(path)
@@ -49,6 +50,7 @@ final class CacheWarmService {
             path: path,
             cacheProfile: profile,
             includedTargets: targets,
+            excludedTargets: [],
             dependenciesOnly: dependenciesOnly
         )
     }

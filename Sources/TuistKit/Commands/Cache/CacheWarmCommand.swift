@@ -27,6 +27,12 @@ struct CacheWarmCommand: AsyncParsableCommand, HasTrackableParameters {
     """)
     var targets: [String] = []
 
+    @Option(
+        name: [.customLong("exclude")],
+        help: "A list of targets to be excluded from being cached."
+    )
+    var excludedTargets: [String] = []
+
     @Flag(
         help: "If passed, the command doesn't cache the targets passed in the `--targets` argument, but only their dependencies"
     )
@@ -45,6 +51,7 @@ struct CacheWarmCommand: AsyncParsableCommand, HasTrackableParameters {
             xcframeworks: options.xcframeworks,
             destination: options.destination,
             targets: Set(targets),
+            excludedTargets: Set(excludedTargets),
             dependenciesOnly: dependenciesOnly
         )
         CacheWarmCommand.analyticsDelegate?.addParameters(

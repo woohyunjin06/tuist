@@ -22,6 +22,7 @@ protocol CacheControlling {
         path: AbsolutePath,
         cacheProfile: TuistGraph.Cache.Profile,
         includedTargets: Set<String>,
+        excludedTargets: Set<String>,
         dependenciesOnly: Bool
     ) async throws
 }
@@ -81,6 +82,7 @@ final class CacheController: CacheControlling {
         path: AbsolutePath,
         cacheProfile: TuistGraph.Cache.Profile,
         includedTargets: Set<String>,
+        excludedTargets: Set<String>,
         dependenciesOnly: Bool
     ) async throws {
         let generator = generatorFactory.cache(
@@ -103,6 +105,7 @@ final class CacheController: CacheControlling {
             cacheProfile: cacheProfile,
             cacheOutputType: artifactBuilder.cacheOutputType,
             includedTargets: includedTargets,
+            excludedTargets: excludedTargets,
             dependenciesOnly: dependenciesOnly
         )
 
@@ -213,13 +216,14 @@ final class CacheController: CacheControlling {
         cacheProfile: TuistGraph.Cache.Profile,
         cacheOutputType: CacheOutputType,
         includedTargets: Set<String>,
+        excludedTargets: Set<String>,
         dependenciesOnly: Bool
     ) async throws -> [(GraphTarget, String)] {
         let graphTraverser = GraphTraverser(graph: graph)
         let includedTargets = includedTargets
             .isEmpty ? Set(graphTraverser.allInternalTargets().map(\.target.name)) : includedTargets
         // When `dependenciesOnly` is true, there is no need to compute `includedTargets` hashes
-        let excludedTargets = dependenciesOnly ? includedTargets : []
+        let excludedTargets = dependenciesOnly ? excludedTargets.union(includedTargets) : excludedTargets
         let hashesByCacheableTarget = try cacheGraphContentHasher.contentHashes(
             for: graph,
             cacheProfile: cacheProfile,

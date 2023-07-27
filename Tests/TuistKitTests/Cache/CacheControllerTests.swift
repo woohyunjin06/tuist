@@ -128,6 +128,7 @@ final class CacheControllerTests: TuistUnitTestCase {
             path: path,
             cacheProfile: .test(configuration: "Debug"),
             includedTargets: [],
+            excludedTargets: [],
             dependenciesOnly: false
         )
 
@@ -209,6 +210,7 @@ final class CacheControllerTests: TuistUnitTestCase {
                 path: path,
                 cacheProfile: .test(configuration: "Debug"),
                 includedTargets: [],
+                excludedTargets: [],
                 dependenciesOnly: false
             ),
             remoteCacheError
@@ -279,6 +281,7 @@ final class CacheControllerTests: TuistUnitTestCase {
             path: path,
             cacheProfile: .test(configuration: "Debug"),
             includedTargets: [],
+            excludedTargets: [],
             dependenciesOnly: false
         )
 
@@ -352,6 +355,7 @@ final class CacheControllerTests: TuistUnitTestCase {
             path: path,
             cacheProfile: .test(configuration: "Debug"),
             includedTargets: [bTarget.name],
+            excludedTargets: [],
             dependenciesOnly: false
         )
 
@@ -412,6 +416,7 @@ final class CacheControllerTests: TuistUnitTestCase {
             cacheProfile: .test(),
             cacheOutputType: .framework,
             includedTargets: [aTarget.name, bTarget.name],
+            excludedTargets: [],
             dependenciesOnly: true
         )
 
@@ -420,6 +425,60 @@ final class CacheControllerTests: TuistUnitTestCase {
         let first = try XCTUnwrap(results.first)
         XCTAssertEqual(first.0, cGraphTarget)
         XCTAssertEqual(first.1, nodeWithHashes[cGraphTarget])
+    }
+    
+    func test_filtered_cache_builds_with_excluded_targets_and_caches_the_frameworks() async throws {
+        // Given
+        let project = Project.test()
+        let aTarget = Target.test(name: "a")
+        let bTarget = Target.test(name: "b")
+        let cTarget = Target.test(name: "c")
+        let aGraphTarget = GraphTarget.test(path: project.path, target: aTarget, project: project)
+        let bGraphTarget = GraphTarget.test(path: project.path, target: bTarget, project: project)
+        let cGraphTarget = GraphTarget.test(path: project.path, target: cTarget, project: project)
+        let graphTargets = [aGraphTarget, bGraphTarget, cGraphTarget]
+        let graph = Graph.test(
+            projects: [project.path: project],
+            targets: graphTargets
+                .reduce(into: [project.path: [String: Target]()]) { $0[project.path]?[$1.target.name] = $1.target },
+            dependencies: [
+                // `bTarget` is a dependency of `aTarget`.
+                .target(name: aGraphTarget.target.name, path: aGraphTarget.path): [
+                    .target(name: bGraphTarget.target.name, path: bGraphTarget.path),
+                ],
+                // `cTarget` is a dependency of `bTarget`.
+                .target(name: bGraphTarget.target.name, path: bGraphTarget.path): [
+                    .target(name: cGraphTarget.target.name, path: cGraphTarget.path),
+                ],
+            ]
+        )
+
+        let nodeWithHashes = [
+            bGraphTarget: "\(bTarget.name)_HASH",
+        ]
+        cacheGraphContentHasher.contentHashesStub = { _, _, _, excludedTargets in
+            // a and c should be excluded since thoses are contains in excluded targets
+            XCTAssertEqual(excludedTargets, [aTarget.name, cTarget.name])
+            return nodeWithHashes
+        }
+
+        artifactBuilder.stubbedCacheOutputType = .xcframework([.device, .simulator])
+
+        // When
+        let results = try await subject.makeHashesByTargetToBeCached(
+            for: graph,
+            cacheProfile: .test(),
+            cacheOutputType: .framework,
+            includedTargets: [aTarget.name, bTarget.name],
+            excludedTargets: [aTarget.name, cTarget.name],
+            dependenciesOnly: false
+        )
+
+        // Then
+        XCTAssertEqual(results.count, 1)
+        let first = try XCTUnwrap(results.first)
+        XCTAssertEqual(first.0, bGraphTarget)
+        XCTAssertEqual(first.1, nodeWithHashes[bGraphTarget])
     }
 
     func test_given_target_to_filter_is_not_cacheable_should_cache_its_depedendencies() async throws {
@@ -455,6 +514,7 @@ final class CacheControllerTests: TuistUnitTestCase {
             cacheProfile: .test(),
             cacheOutputType: .xcframework([.device, .simulator]),
             includedTargets: [aTarget.name],
+            excludedTargets: [],
             dependenciesOnly: false
         )
 
